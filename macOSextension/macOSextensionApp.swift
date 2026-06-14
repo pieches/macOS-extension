@@ -24,7 +24,12 @@ struct macOSextensionApp: App {
                      systemImage: monitor.isEnabled ? "xmark.square.fill" : "xmark.square") {
             Toggle("启用右上角关闭", isOn: $monitor.isEnabled)
             Divider()
-            SettingsLink { Text("管理白名单...") }
+            SettingsLink {
+                Text("管理白名单...")
+            }
+            .simultaneousGesture(TapGesture().onEnded {
+                NSApp.activate(ignoringOtherApps: true)
+            })
             Divider()
             Button("退出") { NSApplication.shared.terminate(nil) }
                 .keyboardShortcut("q")

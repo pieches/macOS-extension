@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		C3ABB0972FDE46C40066C59D /* macOSextension.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = macOSextension.app; path = /Users/piednes/Documents/project/macOSextension/build/Debug/macOSextension.app; sourceTree = "<absolute>"; };
+		C324D7252FDE7B9C003E93B5 /* macOSextension.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macOSextension.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -46,6 +46,7 @@
 			isa = PBXGroup;
 			children = (
 				C3ABB0992FDE46C40066C59D /* macOSextension */,
+				C324D7252FDE7B9C003E93B5 /* macOSextension.app */,
 			);
 			sourceTree = "<group>";
 		};
@@ -71,7 +72,7 @@
 			packageProductDependencies = (
 			);
 			productName = macOSextension;
-			productReference = C3ABB0972FDE46C40066C59D /* macOSextension.app */;
+			productReference = C324D7252FDE7B9C003E93B5 /* macOSextension.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */

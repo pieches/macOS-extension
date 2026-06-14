@@ -9,13 +9,24 @@ import AppKit
 import Combine
 
 final class CornerClickMonitor: ObservableObject {
-    @Published var isEnabled: Bool = true
+    @Published var isEnabled: Bool = true {
+        didSet {
+            // 禁用时若正悬停在角落，及时收起提示，避免残留
+            if !isEnabled && isHovering {
+                isHovering = false
+                hoverIndicator.hide()
+            }
+        }
+    }
 
     private let cornerSize: CGFloat = 30
-    private var globalMonitor: Any?
+    private var globalClickMonitor: Any?
+    private var globalMoveMonitor: Any?
 
     private let whitelist: AppWhitelist
     private let flashOverlay = CornerFlashOverlay()
+    private let hoverIndicator = CornerHoverIndicator()
+    private var isHovering = false
 
     init(whitelist: AppWhitelist) {
         self.whitelist = whitelist
@@ -35,14 +46,40 @@ final class CornerClickMonitor: ObservableObject {
     // MARK: - 监听
 
     private func startMonitoring() {
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .rightMouseDown) { [weak self] _ in
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .rightMouseDown) { [weak self] _ in
             self?.handleRightClick(at: NSEvent.mouseLocation)
+        }
+        globalMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+            self?.handleMouseMoved(at: NSEvent.mouseLocation)
         }
     }
 
     private func stopMonitoring() {
-        if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
-        globalMonitor = nil
+        if let globalClickMonitor { NSEvent.removeMonitor(globalClickMonitor) }
+        if let globalMoveMonitor { NSEvent.removeMonitor(globalMoveMonitor) }
+        globalClickMonitor = nil
+        globalMoveMonitor = nil
+    }
+
+    // MARK: - 悬停反馈
+
+    private func handleMouseMoved(at location: NSPoint) {
+        guard isEnabled, let screen = screen(containing: location) else {
+            setHovering(false)
+            return
+        }
+        setHovering(isInTopRightCorner(location, of: screen), on: screen)
+    }
+
+    /// 只在"进入/离开"状态切换时才触发显示/隐藏，避免每次mouseMoved都重建窗口
+    private func setHovering(_ hovering: Bool, on screen: NSScreen? = nil) {
+        guard hovering != isHovering else { return }
+        isHovering = hovering
+        if hovering, let screen {
+            hoverIndicator.show(on: screen, size: cornerSize)
+        } else {
+            hoverIndicator.hide()
+        }
     }
 
     // MARK: - 事件处理
