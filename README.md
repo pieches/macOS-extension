@@ -12,16 +12,6 @@
 - **多屏支持**：基于鼠标当前所在的 `NSScreen` 判断角落区域，每个屏幕独立生效
 - **后台运行**：以 `.accessory` 模式运行，不出现在 Dock 和 Cmd+Tab 切换器中，仅保留菜单栏图标
 
-## 项目结构
-
-```
-TopRightCloser/
-├── TopRightCloserApp.swift      // App入口，菜单栏 + 设置窗口
-├── CornerClickMonitor.swift     // 核心逻辑：全局鼠标监听、角落判断、关闭窗口
-├── AppWhitelist.swift           // 白名单存储（基于 Bundle ID，持久化到 UserDefaults）
-├── CornerFlashOverlay.swift     // 角落视觉反馈（红/灰闪烁动画）
-└── WhitelistSettingsView.swift  // 设置界面：勾选允许响应的App
-```
 
 ## 系统要求
 
@@ -83,5 +73,4 @@ TopRightCloser/
 
 - [ ] 将 `NSEvent.addGlobalMonitorForEvents` 替换为 `CGEventTap`，彻底拦截角落点击，避免目标App弹出自身菜单
 - [ ] 设置中增加触发区大小、是否显示"ignored"灰色反馈等可调选项
-- [ ] 首次安装且白名单为空时，在菜单栏图标上加提示标记，引导用户完成配置
-- [ ] 支持按窗口而非按App粒度配置白名单
+- [ ] 首次安装且白名单为空时，引导用户完成配置
