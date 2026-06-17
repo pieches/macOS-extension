@@ -9,23 +9,26 @@ import AppKit
 
 /// 在触发角落短暂显示一个色块，告知用户手势已被识别
 final class CornerFlashOverlay {
-    enum Style {
-        case closed   // 窗口已关闭
-        case ignored  // 手势识别到了，但当前App不在白名单中
+   enum Style {
+       case closed   // 窗口已关闭
+       case ignored  // 手势识别到了，但当前App不在白名单中
+       case minimized // 窗口已最小化
 
-        var color: NSColor {
-            switch self {
-            case .closed: return .systemRed
-            case .ignored: return .systemGray
-            }
-        }
-        var peakAlpha: CGFloat {
-            switch self {
-            case .closed: return 0.55
-            case .ignored: return 0.3
-            }
-        }
-    }
+       var color: NSColor {
+           switch self {
+           case .closed: return .systemRed
+           case .ignored: return .systemGray
+           case .minimized: return .systemYellow
+           }
+       }
+       var peakAlpha: CGFloat {
+           switch self {
+           case .closed: return 0.55
+           case .ignored: return 0.3
+           case .minimized: return 0.4
+           }
+       }
+   }
 
     private var panel: NSWindow?
 

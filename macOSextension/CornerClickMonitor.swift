@@ -5,19 +5,20 @@
 //  Created by piednes on 2026-06-14.
 //
 
-import AppKit
-import Combine
+   import AppKit
+   import Combine
+   import CoreGraphics
 
-final class CornerClickMonitor: ObservableObject {
-    @Published var isEnabled: Bool = true {
-        didSet {
-            // 禁用时若正悬停在角落，及时收起提示，避免残留
-            if !isEnabled && isHovering {
-                isHovering = false
-                hoverIndicator.hide()
-            }
-        }
-    }
+   final class CornerClickMonitor: ObservableObject {
+  @Published var isEnabled: Bool = true {
+      didSet {
+          // 禁用时若正悬停在角落，及时收起提示，避免残留
+          if !isEnabled && isHovering {
+              isHovering = false
+              hoverIndicator.hide()
+          }
+      }
+	   }
 
     private let cornerSize: CGFloat = 30
     private var globalClickMonitor: Any?
@@ -89,17 +90,18 @@ final class CornerClickMonitor: ObservableObject {
               let screen = screen(containing: location),
               isInTopRightCorner(location, of: screen) else { return }
 
-        guard let frontApp = NSWorkspace.shared.frontmostApplication,
-              let bundleID = frontApp.bundleIdentifier else { return }
+       guard let frontApp = NSWorkspace.shared.frontmostApplication,
+             let bundleID = frontApp.bundleIdentifier else { return }
 
-        // 不在白名单：给一个低调的灰色反馈，表示"手势识别到了，但本App不响应"
-        guard whitelist.contains(bundleID) else {
-            flashOverlay.flash(on: screen, style: .ignored)
-            return
-        }
-
-        closeFocusedWindow(of: frontApp)
-        flashOverlay.flash(on: screen, style: .closed)
+       // 白名单内 → 最小化；非白名单 → 关闭
+       if whitelist.contains(bundleID) {
+           minimizeFocusedWindow(of: frontApp)
+           flashOverlay.flash(on: screen, style: .minimized)
+       } else {
+           closeFocusedWindow(of: frontApp)
+           flashOverlay.flash(on: screen, style: .closed)
+       }
+       focusNextWindow()
     }
 
     private func screen(containing point: NSPoint) -> NSScreen? {
@@ -127,17 +129,76 @@ final class CornerClickMonitor: ObservableObject {
             return
         }
 
-        // 兜底：没有标准关闭按钮的App，模拟Cmd+W
-        sendCommandW(to: app.processIdentifier)
+       // 兜底：没有标准关闭按钮的App，模拟Cmd+W
+       sendCommandW(to: app.processIdentifier)
     }
 
-    private func sendCommandW(to pid: pid_t) {
-        let source = CGEventSource(stateID: .hidSystemState)
-        let down = CGEvent(keyboardEventSource: source, virtualKey: 0x0D, keyDown: true)
-        let up = CGEvent(keyboardEventSource: source, virtualKey: 0x0D, keyDown: false)
-        down?.flags = .maskCommand
-        up?.flags = .maskCommand
-        down?.postToPid(pid)
-        up?.postToPid(pid)
+   // MARK: - 最小化窗口
+
+   /// 将当前最上层窗口最小化（到 Dock）
+   private func minimizeFocusedWindow(of app: NSRunningApplication) {
+       let axApp = AXUIElementCreateApplication(app.processIdentifier)
+
+       var focusedWindow: CFTypeRef?
+       guard AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &focusedWindow) == .success,
+             let window = focusedWindow else { return }
+
+       // 优先：点击最小化按钮
+       var minimizeButton: CFTypeRef?
+       if AXUIElementCopyAttributeValue(window as! AXUIElement, kAXMinimizeButtonAttribute as CFString, &minimizeButton) == .success,
+          let button = minimizeButton {
+           AXUIElementPerformAction(button as! AXUIElement, kAXPressAction as CFString)
+           return
+       }
+
+       // 兜底：直接设置 kAXMinimizedAttribute
+       AXUIElementSetAttributeValue(
+           window as! AXUIElement,
+           kAXMinimizedAttribute as CFString,
+           kCFBooleanTrue
+       )
+    }
+
+   private func sendCommandW(to pid: pid_t) {
+       let source = CGEventSource(stateID: .hidSystemState)
+       let down = CGEvent(keyboardEventSource: source, virtualKey: 0x0D, keyDown: true)
+       let up = CGEvent(keyboardEventSource: source, virtualKey: 0x0D, keyDown: false)
+       down?.flags = .maskCommand
+       up?.flags = .maskCommand
+       down?.postToPid(pid)
+       up?.postToPid(pid)
+    }
+
+   // MARK: - 自动聚焦下一个窗口
+
+   /// 窗口关闭后，短暂延迟后找到下一个在 Z-order 中的窗口并激活，
+   /// 使用户可以连续关闭窗口而无需手动点击每个窗口。
+   private func focusNextWindow() {
+       DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+           guard let windowInfos = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
+                   as? [[String: Any]] else { return }
+
+           let ourPID = ProcessInfo.processInfo.processIdentifier
+
+           for info in windowInfos {
+               guard
+                   let pid = info[kCGWindowOwnerPID as String] as? pid_t,
+                   pid != ourPID,
+                   let app = NSRunningApplication(processIdentifier: pid),
+                   app.activationPolicy == .regular,
+                   let bounds = info[kCGWindowBounds as String] as? [String: CGFloat],
+                   let width = bounds["Width"], width >= 100,
+                   let height = bounds["Height"], height >= 50,
+                   let layer = info[kCGWindowLayer as String] as? Int,
+                   layer == 0,
+                   // alpha >= 0.9 跳过正在淡出的残留窗口
+                   let alpha = info[kCGWindowAlpha as String] as? Double,
+                   alpha >= 0.9
+               else { continue }
+
+               app.activate(options: .activateIgnoringOtherApps)
+               return
+           }
+       }
     }
 }
