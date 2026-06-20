@@ -25,15 +25,17 @@ final class AppGestureConfig: ObservableObject {
     }
 
     @Published private(set) var config: [String: Mode] = [:]
+    @Published var defaultMode: Mode = .minimize
     private let storageKey = "TopRightCloser.gestureConfig"
+    private let defaultModeKey = "TopRightCloser.defaultMode"
 
     init() {
         load()
     }
 
-    /// 获取指定 bundleID 的手势模式（默认 .minimize）
+    /// 获取指定 bundleID 的手势模式（无单独配置时使用 defaultMode）
     func mode(for bundleID: String) -> Mode {
-        config[bundleID] ?? .minimize
+        config[bundleID] ?? defaultMode
     }
 
     /// 设置手势模式
@@ -42,9 +44,23 @@ final class AppGestureConfig: ObservableObject {
         save()
     }
 
-    /// 重置为默认（最小化）
+    /// 重置单个 App 为默认
     func reset(for bundleID: String) {
         config.removeValue(forKey: bundleID)
+        save()
+    }
+
+    /// 将所有 App 统一设置为同一模式（清除所有单独配置）
+    func setAllApps(mode: Mode) {
+        config.removeAll()
+        defaultMode = mode
+        save()
+    }
+
+    /// 恢复初始设定：默认模式回到最小化，清除所有 App 单独配置
+    func resetAll() {
+        config.removeAll()
+        defaultMode = .minimize
         save()
     }
 
@@ -52,6 +68,11 @@ final class AppGestureConfig: ObservableObject {
     var hasCustomConfig: Bool { !config.isEmpty }
 
     private func load() {
+        if let raw = UserDefaults.standard.string(forKey: defaultModeKey),
+           let mode = Mode(rawValue: raw) {
+            defaultMode = mode
+        }
+
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let decoded = try? JSONDecoder().decode([String: String].self, from: data)
         else { config = [:]; return }
@@ -59,6 +80,8 @@ final class AppGestureConfig: ObservableObject {
     }
 
     private func save() {
+        UserDefaults.standard.set(defaultMode.rawValue, forKey: defaultModeKey)
+
         let dict = config.mapValues { $0.rawValue }
         guard let data = try? JSONEncoder().encode(dict) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
