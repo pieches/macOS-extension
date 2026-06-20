@@ -20,6 +20,7 @@ final class CornerClickMonitor: ObservableObject {
     }
 
     private let cornerSize: CGFloat = 30
+    private let doubleClickInterval: TimeInterval = 0.3
     private var globalClickMonitor: Any?
     private var globalMoveMonitor: Any?
 
@@ -27,6 +28,15 @@ final class CornerClickMonitor: ObservableObject {
     private let flashOverlay = CornerFlashOverlay()
     private let hoverIndicator = CornerHoverIndicator()
     private var isHovering = false
+
+    // 双击检测状态
+    private struct PendingClick {
+        let screen: NSScreen
+        let frontApp: NSRunningApplication
+        let bundleID: String
+        let timer: Timer
+    }
+    private var pendingClick: PendingClick?
 
     init(gestureConfig: AppGestureConfig) {
         self.gestureConfig = gestureConfig
@@ -83,15 +93,35 @@ final class CornerClickMonitor: ObservableObject {
         guard let frontApp = NSWorkspace.shared.frontmostApplication,
               let bundleID = frontApp.bundleIdentifier else { return }
 
-        switch gestureConfig.mode(for: bundleID) {
+        // 双击检测
+        if let pending = pendingClick {
+            pending.timer.invalidate()
+            pendingClick = nil
+            execute(mode: gestureConfig.doubleClickMode(for: bundleID),
+                    on: screen, app: frontApp, bundleID: bundleID)
+        } else {
+            let timer = Timer.scheduledTimer(withTimeInterval: doubleClickInterval, repeats: false) { [weak self] _ in
+                guard let self, let pending = self.pendingClick else { return }
+                self.pendingClick = nil
+                self.execute(mode: self.gestureConfig.singleClickMode(for: pending.bundleID),
+                             on: pending.screen, app: pending.frontApp, bundleID: pending.bundleID)
+            }
+            pendingClick = PendingClick(screen: screen, frontApp: frontApp,
+                                        bundleID: bundleID, timer: timer)
+        }
+    }
+
+    private func execute(mode: AppGestureConfig.Mode, on screen: NSScreen,
+                         app: NSRunningApplication, bundleID: String) {
+        switch mode {
         case .ignore:
             flashOverlay.flash(on: screen, style: .ignored)
         case .minimize:
-            minimizeFocusedWindow(of: frontApp)
+            minimizeFocusedWindow(of: app)
             flashOverlay.flash(on: screen, style: .minimized)
             focusNextWindow()
         case .close:
-            closeFocusedWindow(of: frontApp)
+            closeFocusedWindow(of: app)
             flashOverlay.flash(on: screen, style: .closed)
             focusNextWindow()
         }
